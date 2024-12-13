@@ -1,140 +1,181 @@
-import React, { useEffect, useRef, useState } from "react";
-import { FaMicrophone, FaPaperPlane, FaStop } from "react-icons/fa";
+import React, { useEffect, useState } from "react";
+import { FaStop } from "react-icons/fa";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
 
 const App: React.FC = () => {
-  const [inputText, setInputText] = useState<string>("");
-  const [payload, setPayload] = useState<Record<string, any> | null>(null);
-  const [isTyping, setIsTyping] = useState<boolean>(false);
-  const [recording, setRecording] = useState<boolean>(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
+  const [currentField, setCurrentField] = useState<string | null>(null);
+  const [showPopup, setShowPopup] = useState(false);
+  const { transcript, resetTranscript, browserSupportsSpeechRecognition, listening } = useSpeechRecognition();
 
-  // Speech Recognition Hook
-  const {
-    transcript,
-    resetTranscript,
-    browserSupportsSpeechRecognition,
-    listening,
-  } = useSpeechRecognition();
+  // Normalize email input to remove spaces during transcription
+  const normalizeEmail = (text: string) => text.replace(/\s+/g, "");
 
-  // Handling Speech-to-Text in real-time
+  // Update the form field with the transcript
   useEffect(() => {
-    if (transcript.trim() !== "") {
-      setInputText(transcript); // Show speech in input field
-
-      // Simulate typing effect and timeout to submit after inactivity
-      setIsTyping(true);
-      clearTimeout(timeoutRef.current!);
-      timeoutRef.current = setTimeout(() => {
-        setIsTyping(false);
-        sendToBackend(transcript);
-      }, 2000); // Wait 2 seconds after the user stops speaking before sending
+    if (currentField && transcript.trim() !== "") {
+      setFormData((prev) => ({
+        ...prev,
+        [currentField]: currentField === "email" ? normalizeEmail(transcript) : transcript,
+      }));
     }
-  }, [transcript]);
+  }, [transcript, currentField]);
 
-  // Handle backend communication
-  const sendToBackend = async (text: string) => {
-    console.log("Sending text to backend:", text);
-    // const response = await axios.post("http://localhost:5000/api/transcribe", { text });
-    // console.log(response.data);
-    setInputText("");
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  // Handle manual typing
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setInputText(event.target.value);
-    setIsTyping(true);
-    clearTimeout(timeoutRef.current!); // Reset the timeout whenever user types
-    timeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-      sendToBackend(event.target.value); // Send after timeout
-    }, 2000); // Wait 2 seconds after user stops typing
-  };
-
-  // Start Speech Recognition
-  const startRecording = () => {
+  const startRecording = (field: string) => {
+    resetTranscript(); // Clear the previous transcript
+    setCurrentField(field); // Set the current field to update
     SpeechRecognition.startListening({ continuous: true });
-    setRecording(true);
   };
 
-  // Stop Speech Recognition
   const stopRecording = () => {
     SpeechRecognition.stopListening();
-    SpeechRecognition.abortListening();
-    resetTranscript(); // Clear the transcript
-    setRecording(false);
-    setInputText(""); // Clear the input field
+    setFormData((prev) => ({
+      ...prev,
+      [currentField!]: "", // Clear the text for the current field
+    }));
+    setCurrentField(null); // Reset the current field
   };
-  
 
-  // Only allow speech if the browser supports it
-  if (!browserSupportsSpeechRecognition) {
-    return <div>Browser does not support speech recognition</div>;
-  }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Form Submitted: ", formData);
+    // Add backend logic here (e.g., send formData to server)
+  };
+
+  const handleFieldFocus = (field: string) => {
+    if (!listening || currentField !== field) {
+      startRecording(field);
+    }
+  };
+
+  useEffect(() => {
+    if (!browserSupportsSpeechRecognition) {
+      setShowPopup(true);
+    }
+  }, [browserSupportsSpeechRecognition]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <div className="w-full max-w-3xl bg-white rounded-lg shadow-xl p-6">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-6">
-          Speech-to-Text Assistant
+      {showPopup && (
+        <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg text-center">
+            <h2 className="text-lg font-bold mb-4">Microphone Access Required</h2>
+            <p className="mb-4">Your browser does not support speech recognition, or microphone access is disabled. Please enable it to use this feature.</p>
+            <button
+              onClick={() => setShowPopup(false)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      <form
+        className="w-full max-w-xl bg-white rounded-lg shadow-lg p-6"
+        onSubmit={handleSubmit}
+      >
+        <h1 className="text-2xl font-bold text-center text-blue-600 mb-4">
+          Speech-to-Text Form
         </h1>
 
-        {/* Text Input Area */}
-        <div className="flex items-center space-x-4">
-          <input
-            type="text"
-            value={inputText}
-            onChange={handleChange}
-            placeholder="Type your message or speak..."
-            className="w-full p-3 border rounded-md bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-
-          {/* Send Button for Manual Input */}
-          {inputText.trim() !== "" && !isTyping && !listening && !recording && (
-            <button
-              onClick={() => sendToBackend(inputText)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center justify-center"
-            >
-              <FaPaperPlane />
-            </button>
-          )}
+        {/* Name Field */}
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-2">Name:</label>
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              onFocus={() => handleFieldFocus("name")}
+              placeholder="Enter your name"
+              className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {listening && currentField === "name" && (
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="p-2 rounded-md text-white bg-red-500 hover:opacity-90"
+              >
+                <FaStop />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Speech-to-Text Control Buttons */}
-        <div className="flex justify-center mt-4 space-x-4">
-          {!recording ? (
-            <button
-              onClick={startRecording}
-              className="px-6 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center justify-center"
-            >
-              <FaMicrophone className="mr-2" /> Start
-            </button>
-          ) : (
-            <button
-              onClick={stopRecording}
-              className="px-6 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center justify-center"
-            >
-              <FaStop className="mr-2" /> Stop
-            </button>
-          )}
-
-          {/* Explicit Stop Button */}
-          {recording && (
-            <button
-              onClick={stopRecording}
-              className="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 flex items-center justify-center"
-            >
-              <FaStop className="mr-2" /> Stop Speech-to-Text
-            </button>
-          )}
+        {/* Email Field */}
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-2">Email:</label>
+          <div className="flex items-center space-x-2">
+            <input
+              type="email"
+              name="email"
+              value={formData.email.toLowerCase()}
+              onChange={handleInputChange}
+              onFocus={() => handleFieldFocus("email")}
+              placeholder="Enter your email"
+              className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {listening && currentField === "email" && (
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="p-2 rounded-md text-white bg-red-500 hover:opacity-90"
+              >
+                <FaStop />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Typing Indicator */}
-        {isTyping && <div className="text-gray-500 mt-4">Typing...</div>}
-      </div>
-      {JSON.stringify(inputText)}
+        {/* Message Field */}
+        <div className="mb-4">
+          <label className="block text-gray-700 font-medium mb-2">Message:</label>
+          <div className="flex items-center space-x-2">
+            <textarea
+              name="message"
+              value={formData.message}
+              onChange={handleInputChange}
+              onFocus={() => handleFieldFocus("message")}
+              placeholder="Enter your message"
+              className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={4}
+            ></textarea>
+            {listening && currentField === "message" && (
+              <button
+                type="button"
+                onClick={stopRecording}
+                className="p-2 rounded-md text-white bg-red-500 hover:opacity-90"
+              >
+                <FaStop />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Submit Button */}
+        <button
+          type="submit"
+          className="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600"
+        >
+          Submit
+        </button>
+      </form>
     </div>
   );
 };
