@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { FaStop } from "react-icons/fa";
+import React, { useEffect, useRef, useState } from "react";
+import { FaMicrophone, FaStop } from "react-icons/fa";
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition";
@@ -12,7 +12,12 @@ const App: React.FC = () => {
   });
   const [currentField, setCurrentField] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState(false);
-  const { transcript, resetTranscript, browserSupportsSpeechRecognition, listening } = useSpeechRecognition();
+  const {
+    transcript,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+    listening,
+  } = useSpeechRecognition();
 
   // Normalize email input to remove spaces during transcription
   const normalizeEmail = (text: string) => text.replace(/\s+/g, "");
@@ -22,12 +27,15 @@ const App: React.FC = () => {
     if (currentField && transcript.trim() !== "") {
       setFormData((prev) => ({
         ...prev,
-        [currentField]: currentField === "email" ? normalizeEmail(transcript) : transcript,
+        [currentField]:
+          currentField === "email" ? normalizeEmail(transcript) : transcript,
       }));
     }
   }, [transcript, currentField]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -48,11 +56,13 @@ const App: React.FC = () => {
       [currentField!]: "", // Clear the text for the current field
     }));
     setCurrentField(null); // Reset the current field
+    resetTranscript();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Form Submitted: ", formData);
+    stopRecording();
     // Add backend logic here (e.g., send formData to server)
   };
 
@@ -61,6 +71,20 @@ const App: React.FC = () => {
       startRecording(field);
     }
   };
+
+  const handleClickOutside = (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest("form")) {
+      stopRecording();
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (!browserSupportsSpeechRecognition) {
@@ -73,8 +97,13 @@ const App: React.FC = () => {
       {showPopup && (
         <div className="fixed top-0 left-0 w-full h-full flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-            <h2 className="text-lg font-bold mb-4">Microphone Access Required</h2>
-            <p className="mb-4">Your browser does not support speech recognition, or microphone access is disabled. Please enable it to use this feature.</p>
+            <h2 className="text-lg font-bold mb-4">
+              Microphone Access Required
+            </h2>
+            <p className="mb-4">
+              Your browser does not support speech recognition, or microphone
+              access is disabled. Please enable it to use this feature.
+            </p>
             <button
               onClick={() => setShowPopup(false)}
               className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
@@ -145,7 +174,9 @@ const App: React.FC = () => {
 
         {/* Message Field */}
         <div className="mb-4">
-          <label className="block text-gray-700 font-medium mb-2">Message:</label>
+          <label className="block text-gray-700 font-medium mb-2">
+            Message:
+          </label>
           <div className="flex items-center space-x-2">
             <textarea
               name="message"
