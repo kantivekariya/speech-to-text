@@ -23,7 +23,7 @@ const App: React.FC = () => {
     try {
       setIsLoading(true);
       const response = await fetch(
-        "https://python-api-ten-brown.vercel.app/extract_company_region",
+        "https://python-api-hazel-nu.vercel.app/extract_company_region",
         {
           method: "POST",
           headers: {
@@ -34,9 +34,7 @@ const App: React.FC = () => {
       );
 
       const data = await response.json();
-      const assistantReply =
-        data.choices?.[0]?.message?.content || "No response";
-      setApiResponse(assistantReply);
+      setApiResponse(data);
     } catch (error) {
       console.error("Error calling Groq API:", error);
       setApiResponse("Failed to fetch response. Please try again.");
@@ -96,7 +94,7 @@ const App: React.FC = () => {
       {apiResponse && (
         <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-lg shadow">
           <strong>API Response:</strong>
-          <pre className="whitespace-pre-wrap">{apiResponse}</pre>
+          <pre className="whitespace-pre-wrap">{JSON.stringify(apiResponse)}</pre>
         </div>
       )}
     </div>
